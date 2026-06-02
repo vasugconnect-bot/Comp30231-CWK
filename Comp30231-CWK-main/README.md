@@ -52,4 +52,4 @@ RESTSERVICE/
 │   ├── Item.java                # Item model
 │   └── RentalRequest.java       # Rental request model
 Author
-Vasu Goyal — Nottingham Trent UniversitySonnet 4.6 Low
+Vasu Goyal — Nottingham Trent University
