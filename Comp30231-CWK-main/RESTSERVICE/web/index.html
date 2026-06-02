@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CycleNest</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f7fa;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            color: #2c3e50;
+        }
+        .controls {
+            margin-bottom: 20px;
+        }
+        .controls input {
+            padding: 6px;
+            margin-right: 6px;
+        }
+        .card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        button {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            background: #3498db;
+            color: #fff;
+            cursor: pointer;
+            margin-right: 6px;
+        }
+        button.secondary {
+            background: #2ecc71;
+        }
+        button.danger {
+            background: #e74c3c;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+
+<h1>🚲 CycleNest – Rental Platform</h1>
+<p>Search items, request rentals, cancel requests and check proximity.</p>
+
+<div class="controls">
+    <input type="text" id="searchCategory" placeholder="Search by category">
+    <input type="number" id="maxPrice" placeholder="Max price">
+    <button onclick="searchItems()">Search Items</button>
+    <button onclick="loadItems()">Load All Items</button>
+</div>
+
+<div id="items"></div>
+
+<button class="danger" onclick="cancelRequest()">Cancel Rental Request</button>
+
+<script>
+/* ================= CONFIG ================= */
+
+const API_BASE = "http://localhost:8080/CWK/webresources";
+const API_KEY  = "cyclenest-secret-key";
+
+/* ================= LOAD ALL ITEMS ================= */
+
+function loadItems() {
+    fetch(`${API_BASE}/items`, {
+        headers: {
+            "X-API-Key": API_KEY
+        }
+    })
+    .then(res => {
+        if (!res.ok) throw new Error("Failed to load items");
+        return res.json();
+    })
+    .then(items => renderItems(items))
+    .catch(err => {
+        console.error(err);
+        alert("Failed to load items");
+    });
+}
+
+/* ================= SEARCH ITEMS ================= */
+
+function searchItems() {
+    const category = document.getElementById("searchCategory").value.toLowerCase();
+    const maxPrice = document.getElementById("maxPrice").value;
+
+    fetch(`${API_BASE}/items`, {
+        headers: {
+            "X-API-Key": API_KEY
+        }
+    })
+    .then(res => {
+        if (!res.ok) throw new Error("Search failed");
+        return res.json();
+    })
+    .then(items => {
+        let filtered = items;
+
+        if (category) {
+            filtered = filtered.filter(i =>
+                i.category.toLowerCase().includes(category)
+            );
+        }
+
+        if (maxPrice) {
+            filtered = filtered.filter(i =>
+                i.dailyRate <= maxPrice
+            );
+        }
+
+        renderItems(filtered);
+    })
+    .catch(err => {
+        console.error(err);
+        alert("Search failed");
+    });
+}
+
+/* ================= RENDER ITEMS ================= */
+
+function renderItems(items) {
+    const container = document.getElementById("items");
+    container.innerHTML = "";
+
+    if (items.length === 0) {
+        container.innerHTML = "<p>No items found.</p>";
+        return;
+    }
+
+    items.forEach(item => {
+        const div = document.createElement("div");
+        div.className = "card";
+
+        div.innerHTML = `
+            <h3>${item.name}</h3>
+            <p><b>Category:</b> ${item.category}</p>
+            <p><b>Daily Rate:</b> £${item.dailyRate}</p>
+            <p><b>Location:</b> ${item.location}</p>
+            <p><b>Available:</b> ${item.available}</p>
+
+            <button onclick="createRequest('${item.itemId}')">
+                Rental Request
+            </button>
+
+            <button class="secondary"
+                onclick="checkDistance('${item.itemId}')">
+                Check Proximity
+            </button>
+        `;
+
+        container.appendChild(div);
+    });
+}
+
+/* ================= CREATE REQUEST ================= */
+
+function createRequest(itemId) {
+    const payload = {
+        itemId: itemId,
+        userId: "webUser",
+        requestDate: new Date().toISOString().split("T")[0]
+    };
+
+    fetch(`${API_BASE}/requests`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-API-Key": API_KEY
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(res => {
+        if (!res.ok) throw new Error("Request failed");
+        return res.json();
+    })
+    .then(data => {
+        alert("Request created successfully!\nRequest ID: " + data.requestId);
+    })
+    .catch(err => {
+        console.error(err);
+        alert("Rental request failed");
+    });
+}
+
+/* ================= CANCEL REQUEST ================= */
+
+function cancelRequest() {
+    const id = prompt("Enter Request ID to cancel:");
+    if (!id) return;
+
+    fetch(`${API_BASE}/requests/${id}/cancel`, {
+        method: "PUT",
+        headers: {
+            "X-API-Key": API_KEY
+        }
+    })
+    .then(res => {
+        if (!res.ok) throw new Error("Cancel failed");
+        return res.json();
+    })
+    .then(() => alert("Request cancelled successfully"))
+    .catch(err => {
+        console.error(err);
+        alert("Cancel request failed");
+    });
+}
+
+/* ================= CHECK DISTANCE ================= */
+
+function checkDistance(itemId) {
+    const lat = prompt("Enter your latitude:");
+    const lon = prompt("Enter your longitude:");
+
+    if (!lat || !lon) return;
+
+    fetch(`${API_BASE}/distance?itemId=${itemId}&userLat=${lat}&userLon=${lon}`, {
+        headers: {
+            "X-API-Key": API_KEY
+        }
+    })
+    .then(res => {
+        if (!res.ok) throw new Error("Distance failed");
+        return res.json();
+    })
+    .then(data => {
+        alert(`Distance to item: ${Math.round(data.distance_meters)} meters`);
+    })
+    .catch(err => {
+        console.error(err);
+        alert("Distance check failed");
+    });
+}
+</script>
+
+</body>
+</html>
